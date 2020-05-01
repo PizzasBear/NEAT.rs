@@ -1,3 +1,5 @@
+
+#[allow(unused_variables)]
 pub trait Conf {
     fn get_excess_coef(&self) -> f64 { 1.0 }
     fn get_disjoint_coef(&self) -> f64 { 1.0 }
@@ -13,5 +15,6 @@ pub trait Conf {
     fn is_gaussian_weight_mutation(&self) -> bool { false }
     fn get_gaussian_stddev(&self) -> f64 { 0.0 }
     fn get_uniform_weight_mutation_range(&self) -> f64 { 0.25 }
-    fn get_crossover_prob(&self) -> f64 {}
+    fn get_crossover_prob(&self) -> f64 { 0.75 }
+    fn get_cull_survival_percentage(&self) -> f64 { 0.6 }
 }

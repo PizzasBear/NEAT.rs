@@ -69,7 +69,7 @@ impl Species {
         self.members_shared_fitness.resize(self.members.len(), 0.0);
         
         for i in 0..self.members.len() {
-            let net = nets[self.members[i]];
+            let net = &nets[self.members[i]];
 
             if self.best_fitness < net.fitness {
                 self.staleness = 0;
@@ -80,7 +80,7 @@ impl Species {
         }
     }
 
-    pub fn choose_parent(&self, nets: &Vec<Net>) -> usize {
+    pub fn choose_parent(&self) -> usize {
         use rand::{prelude::*, thread_rng};
         use rand_distr::Uniform;
 
@@ -96,13 +96,59 @@ impl Species {
         panic!("Parent choosing error.");
     }
 
+    pub fn choose_parents(&self) -> (usize, usize) {
+        use rand::{prelude::*, thread_rng};
+        use rand_distr::Uniform;
+
+        let mut to_p1_shared_fitness_sum = Uniform::new(0.0, self.avarage_fitness).sample(&mut thread_rng());
+        let mut to_p2_shared_fitness_sum = Uniform::new(0.0, self.avarage_fitness).sample(&mut thread_rng());
+
+        if to_p2_shared_fitness_sum < to_p1_shared_fitness_sum {
+            let tmp = to_p1_shared_fitness_sum;
+            to_p1_shared_fitness_sum = to_p2_shared_fitness_sum;
+            to_p2_shared_fitness_sum = tmp;
+        }
+
+        let mut shared_fitness_sum = 0.0;
+        let mut p1: usize = self.members.len();
+
+        for i in 0..self.members_shared_fitness.len() {
+            shared_fitness_sum += self.members_shared_fitness[i];
+            if to_p2_shared_fitness_sum < shared_fitness_sum {
+                return (p1, i);
+            }
+            else if p1 < self.members.len() && to_p1_shared_fitness_sum < shared_fitness_sum {
+                p1 = i;
+            }
+        }
+        panic!("Parents choosing error.");
+    }
+
+    pub fn cull(&mut self, nets: &mut Vec<Net>, conf: &dyn Conf) {
+        self.members.sort_unstable_by(|a: &usize, b: &usize| -> std::cmp::Ordering {
+            (-nets[*a].fitness).partial_cmp(&(-nets[*b].fitness)).unwrap()
+        });
+
+        self.members.resize((conf.get_cull_survival_percentage() * (self.members.len() as f64)).ceil() as usize, 0);
+    }
+
     pub fn make_child(&self, innovs: &mut Vec<Innov>, old_innovs_count: usize, nets: &Vec<Net>, conf: &dyn Conf) -> Net {
         use rand::{prelude::*, thread_rng};
         use rand_distr::Uniform;
 
         let mut out: Net;
         if Uniform::from(0.0..1.0).sample(&mut thread_rng()) < conf.get_crossover_prob() {
-
+            let (p1, p2) = self.choose_parents();
+            if p1 != p2 {
+                out = nets[self.members[p1]].crossover(&nets[self.members[p2]], conf);
+            }
+            else {
+                out = nets[self.members[p1]].clone();
+            }
+        }
+        else {
+            let p = self.choose_parent();
+            out = nets[self.members[p]].clone();
         }
 
         out.mutate(innovs, old_innovs_count, conf);
