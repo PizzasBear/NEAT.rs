@@ -1,2 +1,2 @@
 # NEAT.rs
-NEAT algorithm implemented in rust
+NEAT algorithm implemented in rust.
