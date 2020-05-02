@@ -1,0 +1,10 @@
+{
+    "tasks": [
+        {
+            "label": "Cargo build",
+            "type": "shell",
+            "command": "cargo build",
+            "problemMatcher": [],
+        }
+    ]
+}
