@@ -29,7 +29,7 @@ impl Species {
         self.repr = nets[repr_pop_index].clone();
     }
 
-    pub fn add_member(&mut self, net: &mut Net, conf: &dyn Conf) {
+    pub fn add_member(&mut self, net: &mut Net, net_index: usize, conf: &dyn Conf) {
         if !net.in_species {
             let mut disjoint = 0i32;
             let mut matching = 0i32;
@@ -52,13 +52,13 @@ impl Species {
                 }
             }
 
-            let excess = i + j - net.links.len() - self.repr.links.len();
+            let excess = net.links.len() + self.repr.links.len() - i - j;
 
             let size_norm = conf.size_norm(net.links.len(), self.repr.links.len());
             let compat = (conf.get_excess_coef() * (excess as f64) + conf.get_disjoint_coef() * (disjoint as f64)) / size_norm +
                 conf.get_weight_diff_coef() * weight_diff_sum / (matching as f64);
             if compat < conf.get_compat_threshold() {
-                self.members.push(net.index);
+                self.members.push(net_index);
                 net.in_species = true;
             }
         }
@@ -67,6 +67,7 @@ impl Species {
     pub fn fitness_sharing(&mut self, nets: &Vec<Net>) {
         self.staleness += 1;
         self.members_shared_fitness.resize(self.members.len(), 0.0);
+        self.avarage_fitness = 0.0;
         
         for i in 0..self.members.len() {
             let net = &nets[self.members[i]];
@@ -90,7 +91,7 @@ impl Species {
         for i in 0..self.members_shared_fitness.len() {
             shared_fitness_sum += self.members_shared_fitness[i];
             if to_parent_shared_fitness_sum < shared_fitness_sum {
-                return i;
+                return self.members[i];
             }
         }
         panic!("Parent choosing error.");
@@ -112,19 +113,21 @@ impl Species {
         let mut shared_fitness_sum = 0.0;
         let mut p1: usize = self.members.len();
 
-        for i in 0..self.members_shared_fitness.len() {
+        for i in 0..self.members.len() {
             shared_fitness_sum += self.members_shared_fitness[i];
-            if to_p2_shared_fitness_sum < shared_fitness_sum {
-                return (p1, i);
-            }
-            else if p1 < self.members.len() && to_p1_shared_fitness_sum < shared_fitness_sum {
+            
+            if p1 == self.members.len() && to_p1_shared_fitness_sum < shared_fitness_sum {
                 p1 = i;
             }
+            if to_p2_shared_fitness_sum < shared_fitness_sum {
+                return (self.members[p1], self.members[i]);
+            }
         }
-        panic!("Parents choosing error.");
+        panic!("Parents choosing error. sum: {}, p1: {}, p2: {}, avg: {}",
+            shared_fitness_sum, to_p1_shared_fitness_sum, to_p2_shared_fitness_sum, self.avarage_fitness);
     }
 
-    pub fn cull(&mut self, nets: &mut Vec<Net>, conf: &dyn Conf) {
+    pub fn cull(&mut self, nets: &Vec<Net>, conf: &dyn Conf) {
         self.members.sort_unstable_by(|a: &usize, b: &usize| -> std::cmp::Ordering {
             (-nets[*a].fitness).partial_cmp(&(-nets[*b].fitness)).unwrap()
         });
@@ -140,15 +143,15 @@ impl Species {
         if Uniform::from(0.0..1.0).sample(&mut thread_rng()) < conf.get_crossover_prob() {
             let (p1, p2) = self.choose_parents();
             if p1 != p2 {
-                out = nets[self.members[p1]].crossover(&nets[self.members[p2]], conf);
+                out = nets[p1].crossover(&nets[p2], conf);
             }
             else {
-                out = nets[self.members[p1]].clone();
+                out = nets[p1].clone();
             }
         }
         else {
             let p = self.choose_parent();
-            out = nets[self.members[p]].clone();
+            out = nets[p].clone();
         }
 
         out.mutate(innovs, old_innovs_count, conf);

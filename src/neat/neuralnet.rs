@@ -8,7 +8,7 @@ pub struct Net {
     pub(super) links: Vec<Link>,
     pub in_species: bool,
     pub fitness: f64,
-    pub index: usize,
+    //pub index: usize,
 }
 
 use rand::{thread_rng, prelude::*};
@@ -16,7 +16,7 @@ use rand_distr::{Normal, Uniform};
 
 impl Net {
     /// Creates a new neural network.
-    pub fn new(index: usize, inputs_count: usize, outputs_count: usize) -> Self {
+    pub fn new(inputs_count: usize, outputs_count: usize, innovs: &mut Vec<Innov>, old_innovs_count: usize, conf: &dyn Conf) -> Self {
         let mut out = Self {
             nodes: Vec::with_capacity(inputs_count + outputs_count + 1),
             links: Vec::new(),
@@ -24,20 +24,27 @@ impl Net {
             outputs_count: outputs_count,
             in_species: false,
             fitness: 0.0,
-            index: index,
         };
 
         for i in 0..(inputs_count + 1) {
-            out.nodes[i] = Node {
+            out.nodes.push(Node {
                 index: i,
                 in_link_indices: Vec::new(),
-            }
+            });
         }
 
-        for i in (inputs_count + 1)..(inputs_count + outputs_count + 1) {
-            out.nodes[i] = Node {
+        for i in (inputs_count + 1)..(outputs_count + inputs_count + 1) {
+            out.nodes.push(Node {
                 index: i,
                 in_link_indices: Vec::new(),
+            });
+
+            for j in 0..(inputs_count + 1) {
+                out.add_link(
+                    innovs,
+                    old_innovs_count, Uniform::from(-1.0..1.0).sample(&mut thread_rng()) * conf.get_weight_init_range(),
+                    j, i
+                );
             }
         }
 
@@ -48,7 +55,10 @@ impl Net {
         let mut out = self.clone();
         let mut j = 0;
         for (i, link) in self.links.iter().enumerate() {
-            while net2.links[j].innov < link.innov { j += 1; }
+            while j < net2.links.len() && net2.links[j].innov < link.innov { j += 1; }
+            if !(j < net2.links.len()) {
+                break;
+            }
             let link2 = &net2.links[j];
             let out_link = &mut out.links[i];
 
@@ -176,8 +186,10 @@ impl Net {
     pub fn eval(&self, inputs: &[f64], innovs: &Vec<Innov>) -> Vec<f64> {
         let mut out = Vec::<f64>::with_capacity(self.outputs_count);
         let mut evaled_nodes = Vec::<(f64, bool)>::with_capacity(self.nodes.len());
+        evaled_nodes.resize(self.nodes.len(), (0.0, false));
+
         for i in 0..self.outputs_count {
-            out[i] = self.nodes[i + self.inputs_count + 1].eval(self, &mut evaled_nodes, inputs, innovs);
+            out.push(self.nodes[i + self.inputs_count + 1].eval(self, &mut evaled_nodes, inputs, innovs));
         }
 
         out
@@ -219,7 +231,6 @@ impl Clone for Net {
             links: self.links.clone(),
             nodes: self.nodes.clone(),
             fitness: self.fitness,
-            index: self.index,
         }
     }
 }
@@ -303,6 +314,7 @@ impl Node {
     pub fn eval(&self, net: &Net, evaled_nodes: &mut Vec<(f64, bool)>, inputs: &[f64], innovs: &Vec<Innov>) -> f64 {
         if self.index < net.inputs_count { inputs[self.index] }
         else if self.index == net.inputs_count { 1.0 }
+        else if evaled_nodes[self.index].1 { evaled_nodes[self.index].0 }
         else {
             let mut sum = 0.0;
             for link_index in &self.in_link_indices {
