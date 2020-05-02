@@ -118,11 +118,11 @@ impl Net {
         
         if self.inputs_count <= from {
             from += self.outputs_count;
-            to = Uniform::new(self.inputs_count, self.nodes.len()).sample(&mut rng);
-        }
-        else {
             to = Uniform::new(self.inputs_count, self.nodes.len() - 1).sample(&mut rng);
             if from <= to { to += 1; }
+        }
+        else {
+            to = Uniform::new(self.inputs_count, self.nodes.len()).sample(&mut rng);
         }
         
         if self.creates_cycles(from, to, innovs) {
@@ -209,7 +209,7 @@ impl Net {
                         return true;
                     }
 
-                    visited_nodes.push(to);
+                    visited_nodes.push(link_to);
                     newly_visited_nodes_count += 1;
                 }
             }
@@ -314,7 +314,6 @@ impl Node {
     pub fn eval(&self, net: &Net, evaled_nodes: &mut Vec<(f64, bool)>, inputs: &[f64], innovs: &Vec<Innov>) -> f64 {
         if self.index < net.inputs_count { inputs[self.index] }
         else if self.index == net.inputs_count { 1.0 }
-        else if evaled_nodes[self.index].1 { evaled_nodes[self.index].0 }
         else {
             let mut sum = 0.0;
             for link_index in &self.in_link_indices {

@@ -47,7 +47,7 @@ impl Pop {
         let mut best_species_avarage_fitness = 0.0;
         let mut empty_species = Vec::<usize>::new();
 
-        
+
         for (i, species) in self.species.iter_mut().enumerate() {
             if species.members.len() == 0 { empty_species.push(i); continue; }
             species.cull(&self.nets, conf);
@@ -63,6 +63,9 @@ impl Pop {
         empty_species.reverse();
         for i in empty_species {
             self.species.remove(i);
+            if i < best_species_index {
+                best_species_index -= 1;
+            }
         }
 
         let old_innovs_count = self.innovs.len();

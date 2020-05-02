@@ -34,8 +34,6 @@ fn main() {
         println!("\tbest fitness {}", best_fitness);
 
         pop.next_gen(&conf);
-
-        println!("New gen");
     }
 }
 
