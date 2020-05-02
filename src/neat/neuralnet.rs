@@ -15,6 +15,9 @@ use rand::{thread_rng, prelude::*};
 use rand_distr::{Normal, Uniform};
 
 impl Net {
+    pub fn get_links_count(&self) -> usize { self.links.len() }
+    pub fn get_hidden_nodes_count(&self) -> usize { self.nodes.len() - self.inputs_count - 1 - self.outputs_count }
+
     /// Creates a new neural network.
     pub fn new(inputs_count: usize, outputs_count: usize, innovs: &mut Vec<Innov>, old_innovs_count: usize, conf: &dyn Conf) -> Self {
         let mut out = Self {
@@ -40,11 +43,7 @@ impl Net {
             });
 
             for j in 0..(inputs_count + 1) {
-                out.add_link(
-                    innovs,
-                    old_innovs_count, Uniform::from(-1.0..1.0).sample(&mut thread_rng()) * conf.get_weight_init_range(),
-                    j, i
-                );
+                out.add_link(innovs, old_innovs_count, conf.init_weight(), j, i);
             }
         }
 
@@ -131,7 +130,18 @@ impl Net {
             from = tmp;
         }
 
-        self.add_link(innovs, old_innovs_count, Uniform::from(-1.0..1.0).sample(&mut thread_rng()) * conf.get_weight_init_range(), from, to);
+        for i in &self.nodes[to].in_link_indices {
+            if innovs[self.links[*i].innov].from == from {
+                if self.links[*i].enabled {
+                    return;
+                }
+                else {
+                    self.links[*i].enabled = true;
+                }
+            }
+        }
+
+        self.add_link(innovs, old_innovs_count, conf.init_weight(), from, to);
     }
 
     /// Mutates by adding a node.
@@ -249,14 +259,10 @@ impl Link {
     /// Mutates the weight.
     pub fn mutate_weight(&mut self, conf: &dyn Conf) {
         if Uniform::from(0.0..1.0).sample(&mut thread_rng()) < conf.get_complete_weight_override_prob() {
-            self.weight = Uniform::new(-conf.get_weight_init_range(), conf.get_weight_init_range()).sample(&mut thread_rng());
-        }
-        else if conf.is_gaussian_weight_mutation() {
-            self.weight += Normal::new(0.0, conf.get_gaussian_stddev()).unwrap().sample(&mut thread_rng());
+            self.weight = conf.init_weight();
         }
         else {
-            let mutation_range = conf.get_uniform_weight_mutation_range();
-            self.weight += Uniform::new(-mutation_range, mutation_range).sample(&mut thread_rng())
+            conf.mutate_weight(&mut self.weight);
         }
     }
 }
