@@ -16,6 +16,17 @@ use rand_distr::{Normal, Uniform};
 
 impl Net {
     pub fn get_links_count(&self) -> usize { self.links.len() }
+    pub fn get_enabled_links_count(&self) -> usize {
+        let mut out: usize = 0;
+        
+        for link in &self.links {
+            if link.enabled {
+                out += 1;
+            }
+        }
+
+        out
+    }
     pub fn get_hidden_nodes_count(&self) -> usize { self.nodes.len() - self.inputs_count - 1 - self.outputs_count }
 
     /// Creates a new neural network.
@@ -132,12 +143,12 @@ impl Net {
 
         for i in &self.nodes[to].in_link_indices {
             if innovs[self.links[*i].innov].from == from {
-                if self.links[*i].enabled {
-                    return;
-                }
-                else {
+                if !self.links[*i].enabled {
+                    
                     self.links[*i].enabled = true;
+                    self.links[*i].weight = conf.init_weight();
                 }
+                return;
             }
         }
 
@@ -168,13 +179,6 @@ impl Net {
         self.add_link(innovs, old_innovs_count, weight, new_index, to);
     }
 
-    /// Mutates the weights.
-    pub fn mutate_weights(&mut self, conf: &dyn Conf) {
-        for link in &mut self.links {
-            link.mutate_weight(conf);
-        }
-    }
-
     pub fn mutate(&mut self, innovs: &mut Vec<Innov>, old_innovs_count: usize, conf: &dyn Conf) {
         if Uniform::from(0.0..1.0).sample(&mut thread_rng()) <
             conf.get_link_addition_mutation_prob() {
@@ -188,9 +192,33 @@ impl Net {
 
         if Uniform::from(0.0..1.0).sample(&mut thread_rng()) <
             conf.get_weight_mutation_prob() {
-            self.mutate_weights(conf);
+            for link in &mut self.links {
+                link.mutate_weight(conf);
+            }
         }
-    } 
+
+        if Uniform::from(0.0..1.0).sample(&mut thread_rng()) <
+            conf.get_link_disable_mutation_prob() {
+            let tries_count = std::cmp::min(self.links.len() - 1, 12);
+            let mut tried = Vec::<usize>::with_capacity(tries_count);
+            for i in 0..tries_count {
+                let mut link_idx = Uniform::from(0..(self.links.len() - i)).sample(&mut thread_rng());
+                for tried_idx in &tried {
+                    if *tried_idx <= link_idx {
+                        link_idx += 1;
+                    }
+                }
+
+                if self.links[link_idx].enabled {
+                    self.links[link_idx].enabled = false;
+                    break;
+                }
+                else {
+                    tried.push(link_idx);
+                }
+            }
+        }
+    }
 
     /// Evaluates the network.
     pub fn eval(&self, inputs: &[f64], innovs: &Vec<Innov>) -> Vec<f64> {
@@ -214,7 +242,7 @@ impl Net {
                 let link_from = innovs[link.innov].from;
                 let link_to = innovs[link.innov].to;
 
-                if link.enabled && visited_nodes.contains(&link_from) && !visited_nodes.contains(&link_to) {
+                if visited_nodes.contains(&link_from) && !visited_nodes.contains(&link_to) {
                     if link_to == from {
                         return true;
                     }
@@ -258,11 +286,13 @@ pub(super) struct Link {
 impl Link {
     /// Mutates the weight.
     pub fn mutate_weight(&mut self, conf: &dyn Conf) {
-        if Uniform::from(0.0..1.0).sample(&mut thread_rng()) < conf.get_complete_weight_override_prob() {
-            self.weight = conf.init_weight();
-        }
-        else {
-            conf.mutate_weight(&mut self.weight);
+        if self.enabled {
+            if Uniform::from(0.0..1.0).sample(&mut thread_rng()) < conf.get_complete_weight_override_prob() {
+                self.weight = conf.init_weight();
+            }
+            else {
+                conf.mutate_weight(&mut self.weight);
+            }
         }
     }
 }
@@ -324,11 +354,13 @@ impl Node {
             let mut sum = 0.0;
             for link_index in &self.in_link_indices {
                 let link = &net.links[*link_index];
-                if evaled_nodes[self.index].1 {
-                    sum += evaled_nodes[innovs[link.innov].from].0 * link.weight;
-                }
-                else {
-                    sum += net.nodes[innovs[link.innov].from].eval(net, evaled_nodes, inputs, innovs) * link.weight;
+                if link.enabled {
+                    if evaled_nodes[self.index].1 {
+                        sum += evaled_nodes[innovs[link.innov].from].0 * link.weight;
+                    }
+                    else {
+                        sum += net.nodes[innovs[link.innov].from].eval(net, evaled_nodes, inputs, innovs) * link.weight;
+                    }
                 }
             }
             

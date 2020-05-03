@@ -8,8 +8,9 @@ pub trait Conf {
     fn size_norm(&self, size1: usize, size2: usize) -> f64 { 1.0 }
 
     fn get_weight_mutation_prob(&self) -> f64 { 0.8 }
-    fn get_link_addition_mutation_prob(&self) -> f64 { 0.05 }
-    fn get_node_addition_mutation_prob(&self) -> f64 { 0.02 }
+    fn get_link_addition_mutation_prob(&self) -> f64 { 0.5 }
+    fn get_node_addition_mutation_prob(&self) -> f64 { 0.2 }
+    fn get_link_disable_mutation_prob(&self) -> f64 { 0.5 }
     fn get_complete_weight_override_prob(&self) -> f64 { 0.1 }
 
     fn link_enabling_in_child_prob(&self) -> f64 { 0.25 }
@@ -27,8 +28,7 @@ pub trait Conf {
 
         *weight = Normal::new(0.0, 0.5).unwrap().sample(&mut thread_rng());
     }
-    fn get_gaussian_stddev(&self) -> f64 { 0.0 }
-    fn get_uniform_weight_mutation_range(&self) -> f64 { 0.25 }
 
     fn get_cull_survival_percentage(&self) -> f64 { 0.6 }
+    fn get_staleness_threshold(&self) -> u32 { 15 }
 }

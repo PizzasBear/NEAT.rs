@@ -45,11 +45,16 @@ impl Pop {
         let mut species_avarage_fitness_sum = 0.0;
         let mut best_species_index = 0;
         let mut best_species_avarage_fitness = 0.0;
-        let mut empty_species = Vec::<usize>::new();
+        let mut bad_species = Vec::<usize>::new();
 
 
         for (i, species) in self.species.iter_mut().enumerate() {
-            if species.members.len() == 0 { empty_species.push(i); continue; }
+            if species.members.len() == 0 ||
+                conf.get_staleness_threshold() <= species.staleness {
+                
+                bad_species.push(i);
+                continue;
+            }
             species.cull(&self.nets, conf);
             species.fitness_sharing(&self.nets);
             species.choose_random_repr(&self.nets);
@@ -60,8 +65,8 @@ impl Pop {
             }
         }
 
-        empty_species.reverse();
-        for i in empty_species {
+        bad_species.reverse();
+        for i in bad_species {
             self.species.remove(i);
             if i < best_species_index {
                 best_species_index -= 1;
