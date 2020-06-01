@@ -2,7 +2,7 @@
 
 mod neat;
 
-use neat::{Pop, Conf};
+use neat::{Pop, Conf, tst};
 
 struct NEATConf {
     gens: u32,
@@ -18,6 +18,8 @@ impl Conf for NEATConf {
 fn square(a: f64) -> f64 { a * a }
 
 fn main() {
+    
+
     let conf = NEATConf {
         gens: 40,
     };

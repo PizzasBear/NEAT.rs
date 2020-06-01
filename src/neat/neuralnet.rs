@@ -92,7 +92,7 @@ impl Net {
     }
 
     /// adds a link betwean the two specified nodes with the specified weight.
-    fn add_link(&mut self, innovs: &mut Vec<Innov>, old_innovs_count: usize, weight: f64, from: usize, to: usize) {
+    pub fn add_link(&mut self, innovs: &mut Vec<Innov>, old_innovs_count: usize, weight: f64, from: usize, to: usize) {
         let mut innov = innovs.len();
 
         for i in old_innovs_count..innov {
