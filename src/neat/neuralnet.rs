@@ -11,14 +11,16 @@ pub struct Net {
     //pub index: usize,
 }
 
-use rand::{thread_rng, prelude::*};
+use rand::{prelude::*, thread_rng};
 use rand_distr::{Normal, Uniform};
 
 impl Net {
-    pub fn get_links_count(&self) -> usize { self.links.len() }
+    pub fn get_links_count(&self) -> usize {
+        self.links.len()
+    }
     pub fn get_enabled_links_count(&self) -> usize {
         let mut out: usize = 0;
-        
+
         for link in &self.links {
             if link.enabled {
                 out += 1;
@@ -27,10 +29,18 @@ impl Net {
 
         out
     }
-    pub fn get_hidden_nodes_count(&self) -> usize { self.nodes.len() - self.inputs_count - 1 - self.outputs_count }
+    pub fn get_hidden_nodes_count(&self) -> usize {
+        self.nodes.len() - self.inputs_count - 1 - self.outputs_count
+    }
 
     /// Creates a new neural network.
-    pub fn new(inputs_count: usize, outputs_count: usize, innovs: &mut Vec<Innov>, old_innovs_count: usize, conf: &dyn Conf) -> Self {
+    pub fn new(
+        inputs_count: usize,
+        outputs_count: usize,
+        innovs: &mut Vec<Innov>,
+        old_innovs_count: usize,
+        conf: &dyn Conf,
+    ) -> Self {
         let mut out = Self {
             nodes: Vec::with_capacity(inputs_count + outputs_count + 1),
             links: Vec::new(),
@@ -65,7 +75,9 @@ impl Net {
         let mut out = self.clone();
         let mut j = 0;
         for (i, link) in self.links.iter().enumerate() {
-            while j < net2.links.len() && net2.links[j].innov < link.innov { j += 1; }
+            while j < net2.links.len() && net2.links[j].innov < link.innov {
+                j += 1;
+            }
             if !(j < net2.links.len()) {
                 break;
             }
@@ -78,10 +90,11 @@ impl Net {
                 }
 
                 if link.enabled != link2.enabled {
-                    if Uniform::from(0.0..1.0).sample(&mut thread_rng()) < conf.link_enabling_in_child_prob() {
+                    if Uniform::from(0.0..1.0).sample(&mut thread_rng())
+                        < conf.link_enabling_in_child_prob()
+                    {
                         out_link.enabled = true;
-                    }
-                    else {
+                    } else {
                         out_link.enabled = false;
                     }
                 }
@@ -92,7 +105,14 @@ impl Net {
     }
 
     /// adds a link betwean the two specified nodes with the specified weight.
-    pub fn add_link(&mut self, innovs: &mut Vec<Innov>, old_innovs_count: usize, weight: f64, from: usize, to: usize) {
+    pub fn add_link(
+        &mut self,
+        innovs: &mut Vec<Innov>,
+        old_innovs_count: usize,
+        weight: f64,
+        from: usize,
+        to: usize,
+    ) {
         let mut innov = innovs.len();
 
         for i in old_innovs_count..innov {
@@ -120,21 +140,27 @@ impl Net {
     }
 
     /// Mutates by adding a link.
-    pub fn mutate_link(&mut self, innovs: &mut Vec<Innov>, old_innovs_count: usize, conf: &dyn Conf) {
+    pub fn mutate_link(
+        &mut self,
+        innovs: &mut Vec<Innov>,
+        old_innovs_count: usize,
+        conf: &dyn Conf,
+    ) {
         let mut rng = thread_rng();
-        
+
         let mut from = Uniform::new(0, self.nodes.len() - self.outputs_count).sample(&mut rng);
         let mut to: usize;
-        
+
         if self.inputs_count <= from {
             from += self.outputs_count;
             to = Uniform::new(self.inputs_count, self.nodes.len() - 1).sample(&mut rng);
-            if from <= to { to += 1; }
-        }
-        else {
+            if from <= to {
+                to += 1;
+            }
+        } else {
             to = Uniform::new(self.inputs_count, self.nodes.len()).sample(&mut rng);
         }
-        
+
         if self.creates_cycles(from, to, innovs) {
             let tmp = to;
             to = from;
@@ -144,7 +170,6 @@ impl Net {
         for i in &self.nodes[to].in_link_indices {
             if innovs[self.links[*i].innov].from == from {
                 if !self.links[*i].enabled {
-                    
                     self.links[*i].enabled = true;
                     self.links[*i].weight = conf.init_weight();
                 }
@@ -169,7 +194,7 @@ impl Net {
             to = innovs[link.innov].to;
             weight = link.weight;
         }
-        
+
         let new_index = self.nodes.len();
         self.nodes.push(Node {
             in_link_indices: Vec::new(),
@@ -180,29 +205,31 @@ impl Net {
     }
 
     pub fn mutate(&mut self, innovs: &mut Vec<Innov>, old_innovs_count: usize, conf: &dyn Conf) {
-        if Uniform::from(0.0..1.0).sample(&mut thread_rng()) <
-            conf.get_link_addition_mutation_prob() {
+        if Uniform::from(0.0..1.0).sample(&mut thread_rng())
+            < conf.get_link_addition_mutation_prob()
+        {
             self.mutate_link(innovs, old_innovs_count, conf);
         }
 
-        if Uniform::from(0.0..1.0).sample(&mut thread_rng()) <
-            conf.get_node_addition_mutation_prob() {
+        if Uniform::from(0.0..1.0).sample(&mut thread_rng())
+            < conf.get_node_addition_mutation_prob()
+        {
             self.mutate_node(innovs, old_innovs_count);
         }
 
-        if Uniform::from(0.0..1.0).sample(&mut thread_rng()) <
-            conf.get_weight_mutation_prob() {
+        if Uniform::from(0.0..1.0).sample(&mut thread_rng()) < conf.get_weight_mutation_prob() {
             for link in &mut self.links {
                 link.mutate_weight(conf);
             }
         }
 
-        if Uniform::from(0.0..1.0).sample(&mut thread_rng()) <
-            conf.get_link_disable_mutation_prob() {
+        if Uniform::from(0.0..1.0).sample(&mut thread_rng()) < conf.get_link_disable_mutation_prob()
+        {
             let tries_count = std::cmp::min(self.links.len() - 1, 12);
             let mut tried = Vec::<usize>::with_capacity(tries_count);
             for i in 0..tries_count {
-                let mut link_idx = Uniform::from(0..(self.links.len() - i)).sample(&mut thread_rng());
+                let mut link_idx =
+                    Uniform::from(0..(self.links.len() - i)).sample(&mut thread_rng());
                 for tried_idx in &tried {
                     if *tried_idx <= link_idx {
                         link_idx += 1;
@@ -212,8 +239,7 @@ impl Net {
                 if self.links[link_idx].enabled {
                     self.links[link_idx].enabled = false;
                     break;
-                }
-                else {
+                } else {
                     tried.push(link_idx);
                 }
             }
@@ -227,7 +253,12 @@ impl Net {
         evaled_nodes.resize(self.nodes.len(), (0.0, false));
 
         for i in 0..self.outputs_count {
-            out.push(self.nodes[i + self.inputs_count + 1].eval(self, &mut evaled_nodes, inputs, innovs));
+            out.push(self.nodes[i + self.inputs_count + 1].eval(
+                self,
+                &mut evaled_nodes,
+                inputs,
+                innovs,
+            ));
         }
 
         out
@@ -287,10 +318,11 @@ impl Link {
     /// Mutates the weight.
     pub fn mutate_weight(&mut self, conf: &dyn Conf) {
         if self.enabled {
-            if Uniform::from(0.0..1.0).sample(&mut thread_rng()) < conf.get_complete_weight_override_prob() {
+            if Uniform::from(0.0..1.0).sample(&mut thread_rng())
+                < conf.get_complete_weight_override_prob()
+            {
                 self.weight = conf.init_weight();
-            }
-            else {
+            } else {
                 conf.mutate_weight(&mut self.weight);
             }
         }
@@ -317,9 +349,9 @@ pub(super) struct Node {
 
 impl Node {
     /// Finds a link by its innovations number. The method return the links index in `self.in_links`.
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// Panics if the a link with the specified innovation number wasn't found in `self.in_links`.
     pub fn find_link(&mut self, innov: usize, net: &Net) -> usize {
         let mut right_boundary = self.in_link_indices.len() - 1;
@@ -332,11 +364,9 @@ impl Node {
 
             if middle_innov < innov {
                 left_boundary = middle + 1
-            }
-            else if innov < middle_innov {
+            } else if innov < middle_innov {
                 right_boundary = middle - 1;
-            }
-            else {
+            } else {
                 return middle;
             }
         }
@@ -344,26 +374,40 @@ impl Node {
         panic!("Link not found!");
     }
 
-    pub fn activate(x: f64) -> f64 { 1.0 / (1.0 + (-4.9 * x).exp()) }
+    pub fn activate(x: f64) -> f64 {
+        1.0 / (1.0 + (-4.9 * x).exp())
+    }
 
     /// evaluate this node
-    pub fn eval(&self, net: &Net, evaled_nodes: &mut Vec<(f64, bool)>, inputs: &[f64], innovs: &Vec<Innov>) -> f64 {
-        if self.index < net.inputs_count { inputs[self.index] }
-        else if self.index == net.inputs_count { 1.0 }
-        else {
+    pub fn eval(
+        &self,
+        net: &Net,
+        evaled_nodes: &mut Vec<(f64, bool)>,
+        inputs: &[f64],
+        innovs: &Vec<Innov>,
+    ) -> f64 {
+        if self.index < net.inputs_count {
+            inputs[self.index]
+        } else if self.index == net.inputs_count {
+            1.0
+        } else {
             let mut sum = 0.0;
             for link_index in &self.in_link_indices {
                 let link = &net.links[*link_index];
                 if link.enabled {
                     if evaled_nodes[self.index].1 {
                         sum += evaled_nodes[innovs[link.innov].from].0 * link.weight;
-                    }
-                    else {
-                        sum += net.nodes[innovs[link.innov].from].eval(net, evaled_nodes, inputs, innovs) * link.weight;
+                    } else {
+                        sum += net.nodes[innovs[link.innov].from].eval(
+                            net,
+                            evaled_nodes,
+                            inputs,
+                            innovs,
+                        ) * link.weight;
                     }
                 }
             }
-            
+
             evaled_nodes[self.index] = (Self::activate(sum), true);
 
             evaled_nodes[self.index].0
@@ -380,7 +424,7 @@ impl Clone for Node {
     }
 }
 
-/// The innovation object. 
+/// The innovation object.
 pub struct Innov {
     pub from: usize,
     pub to: usize,

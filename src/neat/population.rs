@@ -1,4 +1,4 @@
-use crate::neat::{Net, Species, Conf, Innov};
+use crate::neat::{Conf, Innov, Net, Species};
 
 pub struct Pop {
     pub size: usize,
@@ -15,9 +15,15 @@ impl Pop {
             species: Vec::new(),
             innovs: Vec::new(),
         };
-        
+
         for _ in 0..size {
-            out.nets.push(Net::new(inputs_count, outputs_count, &mut out.innovs, 0, conf));
+            out.nets.push(Net::new(
+                inputs_count,
+                outputs_count,
+                &mut out.innovs,
+                0,
+                conf,
+            ));
         }
 
         out
@@ -25,7 +31,7 @@ impl Pop {
 
     pub fn next_gen(&mut self, conf: &dyn Conf) {
         let mut next_nets = Vec::<Net>::with_capacity(self.size);
-        
+
         for species in &mut self.species {
             species.clear();
         }
@@ -34,7 +40,9 @@ impl Pop {
             net.in_species = false;
             for species in &mut self.species {
                 species.add_member(net, i, conf);
-                if net.in_species { break }
+                if net.in_species {
+                    break;
+                }
             }
 
             if !net.in_species {
@@ -47,11 +55,8 @@ impl Pop {
         let mut best_species_avarage_fitness = 0.0;
         let mut bad_species = Vec::<usize>::new();
 
-
         for (i, species) in self.species.iter_mut().enumerate() {
-            if species.members.len() == 0 ||
-                conf.get_staleness_threshold() <= species.staleness {
-                
+            if species.members.len() == 0 || conf.get_staleness_threshold() <= species.staleness {
                 bad_species.push(i);
                 continue;
             }
@@ -76,14 +81,26 @@ impl Pop {
         let old_innovs_count = self.innovs.len();
 
         for species in &self.species {
-            let baby_count = (species.avarage_fitness / species_avarage_fitness_sum * (self.size as f64)).floor() as usize;
+            let baby_count = (species.avarage_fitness / species_avarage_fitness_sum
+                * (self.size as f64))
+                .floor() as usize;
             for _ in 0..baby_count {
-                next_nets.push(species.make_child(&mut self.innovs, old_innovs_count, &self.nets, conf));
+                next_nets.push(species.make_child(
+                    &mut self.innovs,
+                    old_innovs_count,
+                    &self.nets,
+                    conf,
+                ));
             }
         }
 
         while next_nets.len() < self.size {
-            next_nets.push(self.species[best_species_index].make_child(&mut self.innovs, old_innovs_count, &self.nets, conf));
+            next_nets.push(self.species[best_species_index].make_child(
+                &mut self.innovs,
+                old_innovs_count,
+                &self.nets,
+                conf,
+            ));
         }
 
         self.nets = next_nets;

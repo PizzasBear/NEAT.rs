@@ -1,4 +1,4 @@
-use crate::neat::{Net, Pop, Conf, Innov};
+use crate::neat::{Conf, Innov, Net, Pop};
 
 pub struct Species {
     pub members: Vec<usize>,
@@ -25,7 +25,8 @@ impl Species {
         use rand::{prelude::*, thread_rng};
         use rand_distr::Uniform;
 
-        let repr_pop_index = self.members[Uniform::new(0, self.members.len()).sample(&mut thread_rng())];
+        let repr_pop_index =
+            self.members[Uniform::new(0, self.members.len()).sample(&mut thread_rng())];
         self.repr = nets[repr_pop_index].clone();
     }
 
@@ -34,29 +35,30 @@ impl Species {
             let mut disjoint = 0i32;
             let mut matching = 0i32;
             let mut weight_diff_sum = 0f64;
-            
+
             let (mut i, mut j) = (0usize, 0usize);
             while i < net.links.len() && j < self.repr.links.len() {
                 if net.links[i].innov < self.repr.links[j].innov {
                     disjoint += 1;
                     i += 1;
-                }
-                else if self.repr.links[j].innov < net.links[i].innov {
+                } else if self.repr.links[j].innov < net.links[i].innov {
                     disjoint += 1;
                     j += 1;
-                }
-                else {
+                } else {
                     matching += 1;
                     weight_diff_sum += (net.links[i].weight - self.repr.links[j].weight).abs();
-                    i += 1; j += 1;
+                    i += 1;
+                    j += 1;
                 }
             }
 
             let excess = net.links.len() + self.repr.links.len() - i - j;
 
             let size_norm = conf.size_norm(net.links.len(), self.repr.links.len());
-            let compat = (conf.get_excess_coef() * (excess as f64) + conf.get_disjoint_coef() * (disjoint as f64)) / size_norm +
-                conf.get_weight_diff_coef() * weight_diff_sum / (matching as f64);
+            let compat = (conf.get_excess_coef() * (excess as f64)
+                + conf.get_disjoint_coef() * (disjoint as f64))
+                / size_norm
+                + conf.get_weight_diff_coef() * weight_diff_sum / (matching as f64);
             if compat < conf.get_compat_threshold() {
                 self.members.push(net_index);
                 net.in_species = true;
@@ -68,7 +70,7 @@ impl Species {
         self.staleness += 1;
         self.members_shared_fitness.resize(self.members.len(), 0.0);
         self.avarage_fitness = 0.0;
-        
+
         for i in 0..self.members.len() {
             let net = &nets[self.members[i]];
 
@@ -85,7 +87,8 @@ impl Species {
         use rand::{prelude::*, thread_rng};
         use rand_distr::Uniform;
 
-        let to_parent_shared_fitness_sum = Uniform::new(0.0, self.avarage_fitness).sample(&mut thread_rng());
+        let to_parent_shared_fitness_sum =
+            Uniform::new(0.0, self.avarage_fitness).sample(&mut thread_rng());
         let mut shared_fitness_sum = 0.0;
 
         for i in 0..self.members_shared_fitness.len() {
@@ -101,8 +104,10 @@ impl Species {
         use rand::{prelude::*, thread_rng};
         use rand_distr::Uniform;
 
-        let mut to_p1_shared_fitness_sum = Uniform::new(0.0, self.avarage_fitness).sample(&mut thread_rng());
-        let mut to_p2_shared_fitness_sum = Uniform::new(0.0, self.avarage_fitness).sample(&mut thread_rng());
+        let mut to_p1_shared_fitness_sum =
+            Uniform::new(0.0, self.avarage_fitness).sample(&mut thread_rng());
+        let mut to_p2_shared_fitness_sum =
+            Uniform::new(0.0, self.avarage_fitness).sample(&mut thread_rng());
 
         if to_p2_shared_fitness_sum < to_p1_shared_fitness_sum {
             let tmp = to_p1_shared_fitness_sum;
@@ -115,7 +120,7 @@ impl Species {
 
         for i in 0..self.members.len() {
             shared_fitness_sum += self.members_shared_fitness[i];
-            
+
             if p1 == self.members.len() && to_p1_shared_fitness_sum < shared_fitness_sum {
                 p1 = i;
             }
@@ -123,19 +128,36 @@ impl Species {
                 return (self.members[p1], self.members[i]);
             }
         }
-        panic!("Parents choosing error. sum: {}, p1: {}, p2: {}, avg: {}",
-            shared_fitness_sum, to_p1_shared_fitness_sum, to_p2_shared_fitness_sum, self.avarage_fitness);
+        panic!(
+            "Parents choosing error. sum: {}, p1: {}, p2: {}, avg: {}",
+            shared_fitness_sum,
+            to_p1_shared_fitness_sum,
+            to_p2_shared_fitness_sum,
+            self.avarage_fitness
+        );
     }
 
     pub fn cull(&mut self, nets: &Vec<Net>, conf: &dyn Conf) {
-        self.members.sort_unstable_by(|a: &usize, b: &usize| -> std::cmp::Ordering {
-            (-nets[*a].fitness).partial_cmp(&(-nets[*b].fitness)).unwrap()
-        });
+        self.members
+            .sort_unstable_by(|a: &usize, b: &usize| -> std::cmp::Ordering {
+                (-nets[*a].fitness)
+                    .partial_cmp(&(-nets[*b].fitness))
+                    .unwrap()
+            });
 
-        self.members.resize((conf.get_cull_survival_percentage() * (self.members.len() as f64)).ceil() as usize, 0);
+        self.members.resize(
+            (conf.get_cull_survival_percentage() * (self.members.len() as f64)).ceil() as usize,
+            0,
+        );
     }
 
-    pub fn make_child(&self, innovs: &mut Vec<Innov>, old_innovs_count: usize, nets: &Vec<Net>, conf: &dyn Conf) -> Net {
+    pub fn make_child(
+        &self,
+        innovs: &mut Vec<Innov>,
+        old_innovs_count: usize,
+        nets: &Vec<Net>,
+        conf: &dyn Conf,
+    ) -> Net {
         use rand::{prelude::*, thread_rng};
         use rand_distr::Uniform;
 
@@ -144,12 +166,10 @@ impl Species {
             let (p1, p2) = self.choose_parents();
             if p1 != p2 {
                 out = nets[p1].crossover(&nets[p2], conf);
-            }
-            else {
+            } else {
                 out = nets[p1].clone();
             }
-        }
-        else {
+        } else {
             let p = self.choose_parent();
             out = nets[p].clone();
         }
